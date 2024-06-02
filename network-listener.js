@@ -1,19 +1,19 @@
-const version = '1.0';
+const debuggerVersion = '1.0';
 const env = 'dev';
 const config = {
   prod: {
     baseUrl: '',
   },
   stag: {
-    baseUrl: 'https://core-api1.test.teksavvy.ca:19283',
+    baseUrl: '',
   },
   dev: {
-    baseUrl: 'https://localhost:44388',
+    baseUrl: 'http://localhost:3000',
   },
 };
 
-const portalUrlStorageKey = 'portalUrls';
-const resourceTypes = ['XHR', 'Fetch'];
+const domainsStorageKey = 'watched_domains';
+const resources = ['XHR', 'Fetch'];
 
 /**
  * Listen to the url changes and attach/detach debugger
@@ -27,7 +27,7 @@ function onPageChange(tabId, { status, url }, { url: tabUrl }) {
   shouldListen(url, function (isVendorPortalPage) {
     if (isVendorPortalPage) {
       runIfNotAttached(tabId, function () {
-        chrome.debugger.attach({ tabId }, version, onAttached(tabId));
+        chrome.debugger.attach({ tabId }, debuggerVersion, onAttached(tabId));
       });
     } else if (status === 'complete') {
       shouldListen(tabUrl, function (isVendorPortalTab) {
@@ -100,7 +100,7 @@ function onNetworkEvent(tabId) {
  * @returns
  */
 function importantResourceType(type) {
-  return type && resourceTypes.indexOf(type) > -1;
+  return type && resources.indexOf(type) > -1;
 }
 
 /**
@@ -183,7 +183,7 @@ function tryToStringify(val) {
 function collectNetworkEvent(event, callback) {
   var xhr = new XMLHttpRequest();
   xhr.withCredentials = true;
-  xhr.open('POST', `${config[env].baseUrl}/Event`, true);
+  xhr.open('POST', `${config[env].baseUrl}/events`, true);
   xhr.setRequestHeader('Content-Type', 'application/json');
 
   xhr.addEventListener('readystatechange', function () {
@@ -196,9 +196,9 @@ function collectNetworkEvent(event, callback) {
 }
 
 function getPortalUrls(callback) {
-  chrome.storage.local.get(portalUrlStorageKey, function (storage) {
-    if (storage[portalUrlStorageKey]) {
-      callback(storage[portalUrlStorageKey]);
+  chrome.storage.local.get(domainsStorageKey, function (storage) {
+    if (storage[domainsStorageKey]) {
+      callback(storage[domainsStorageKey]);
     } else {
       var xhr = new XMLHttpRequest();
       xhr.withCredentials = true;
@@ -206,12 +206,12 @@ function getPortalUrls(callback) {
       xhr.addEventListener('readystatechange', function () {
         if (this.readyState === 4) {
           const urls = JSON.parse(this.responseText);
-          chrome.storage.local.set({ [portalUrlStorageKey]: urls });
+          chrome.storage.local.set({ [domainsStorageKey]: urls });
           callback(urls);
         }
       });
 
-      xhr.open('GET', `${config[env].baseUrl}/DataOptions/Portals`);
+      xhr.open('GET', `${config[env].baseUrl}/domains`);
 
       xhr.send();
     }
@@ -229,6 +229,7 @@ function onTabRemoved(tabId, _) {
 
 chrome.tabs.onRemoved.addListener(onTabRemoved);
 chrome.tabs.onUpdated.addListener(onPageChange);
-getPortalUrls(function (urls) {
-  console.log(urls);
-});
+
+// getPortalUrls(function (urls) {
+//   console.log(urls);
+// });
